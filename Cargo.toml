@@ -7,5 +7,9 @@ edition = "2024"
 shared_structs = { path = "./shared_structs", version = "0.1.0" }
 proc_macro = { path = "./proc_macro", version = "0.1.0" }
 
+[workspace]
+resolver = "3"
+members = ["proc_macro", "shared_structs"]
+
 [features]
 lr1 = ["shared_structs/lr1", "proc_macro/lr1"]

@@ -1,3 +1,1 @@
-target
-shared_structs/target
-proc_macro/target
+target/
