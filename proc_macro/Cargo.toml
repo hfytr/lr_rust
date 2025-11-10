@@ -10,7 +10,7 @@ proc-macro = true
 
 [dependencies]
 syn = { version = "2.0.104", features = ["full"] }
-shared_structs = { path = "../shared_structs" }
+shared_structs = { path = "../shared_structs", version = "0.1.0" }
 proc-macro2 = "1.0.95"
 quote = "1.0.40"
 
