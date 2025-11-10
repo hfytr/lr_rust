@@ -7,7 +7,7 @@ license = "MIT"
 
 [dependencies]
 lr_rust_shared_structs = { path = "./lr_rust_shared_structs", version = "0.1.0" }
-lr_rust_parsing_macro = { path = "./lr_rust_parsing_macro", version = "0.1.0" }
+lr_rust_parsing_macro = { path = "./lr_rust_parsing_macro", version = "0.1.1" }
 
 [workspace]
 resolver = "3"
