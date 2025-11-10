@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "lr_rust"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "lr_rust_parsing_macro",
  "lr_rust_shared_structs",
@@ -12,7 +12,7 @@ dependencies = [
 
 [[package]]
 name = "lr_rust_parsing_macro"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "lr_rust_shared_structs",
  "proc-macro2",

@@ -1,6 +1,6 @@
 [package]
 name = "lr_rust"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "A package for LALR(1) and LR(1) parsing."
 license = "MIT"
