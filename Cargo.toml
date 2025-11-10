@@ -2,6 +2,8 @@
 name = "parser"
 version = "0.1.0"
 edition = "2024"
+description = "A package which allows lalr1, and lr1 parsing. Comes with a regex engine."
+license = "MIT"
 
 [dependencies]
 shared_structs = { path = "./shared_structs", version = "0.1.0" }
