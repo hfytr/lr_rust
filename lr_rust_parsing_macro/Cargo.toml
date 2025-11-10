@@ -1,0 +1,18 @@
+[package]
+name = "lr_rust_parsing_macro"
+version = "0.1.0"
+edition = "2024"
+description = "parsing_macro sub library for lr_rust."
+license = "MIT"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "2.0.104", features = ["full"] }
+lr_rust_shared_structs = { path = "../lr_rust_shared_structs", version = "0.1.0" }
+proc-macro2 = "1.0.95"
+quote = "1.0.40"
+
+[features]
+lr1 = ["lr_rust_shared_structs/lr1"]

@@ -3,21 +3,29 @@
 version = 4
 
 [[package]]
-name = "parser"
+name = "lr_rust"
 version = "0.1.0"
 dependencies = [
- "parsing_macro",
- "shared_structs",
+ "lr_rust_parsing_macro",
+ "lr_rust_shared_structs",
 ]
 
 [[package]]
-name = "parsing_macro"
+name = "lr_rust_parsing_macro"
+version = "0.1.0"
+dependencies = [
+ "lr_rust_shared_structs",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "lr_rust_shared_structs"
 version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "quote",
- "shared_structs",
- "syn",
 ]
 
 [[package]]
@@ -36,14 +44,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1885c039570dc00dcb4ff087a89e185fd56bae234ddc7f056a945bf36467248d"
 dependencies = [
  "proc-macro2",
-]
-
-[[package]]
-name = "shared_structs"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
 ]
 
 [[package]]

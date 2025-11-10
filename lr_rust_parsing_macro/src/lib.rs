@@ -3,7 +3,7 @@ mod lexer;
 use crate::lexer::{process_productions, Production};
 use proc_macro2::{Ident, Punct, Spacing, Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens, TokenStreamExt};
-use shared_structs::{ParseTable, Trie, RegexDFA};
+use lr_rust_shared_structs::{ParseTable, Trie, RegexDFA};
 use std::{collections::BTreeSet, process::exit};
 use syn::{
     parse::{discouraged::Speculative, Parse},
@@ -315,7 +315,7 @@ fn parser2(input: TokenStream) -> Result<TokenStream, Error> {
         #kind_def
 
         #generated_fn ->
-            Result<parser::Engine<
+            Result<lr_rust_shared_structs::Engine<
                 #out_type,
                 #state_type,
                 >,
@@ -325,7 +325,7 @@ fn parser2(input: TokenStream) -> Result<TokenStream, Error> {
             #lexeme_callback_defs
             #error_callback_defs
             #rule_callback_defs
-            parser::Engine::from_raw(
+            lr_rust_shared_structs::Engine::from_raw(
                 #parser,
                 #regex,
                 #trie,

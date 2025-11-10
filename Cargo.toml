@@ -1,17 +1,17 @@
 [package]
-name = "parser"
+name = "lr_rust"
 version = "0.1.0"
 edition = "2024"
-description = "A package which allows lalr1, and lr1 parsing. Comes with a regex engine."
+description = "A package for LALR(1) and LR(1) parsing."
 license = "MIT"
 
 [dependencies]
-shared_structs = { path = "./shared_structs", version = "0.1.0" }
-parsing_macro = { path = "./parsing_macro", version = "0.1.0" }
+lr_rust_shared_structs = { path = "./lr_rust_shared_structs", version = "0.1.0" }
+lr_rust_parsing_macro = { path = "./lr_rust_parsing_macro", version = "0.1.0" }
 
 [workspace]
 resolver = "3"
-members = ["parsing_macro", "shared_structs"]
+members = ["lr_rust_parsing_macro", "lr_rust_shared_structs"]
 
 [features]
-lr1 = ["shared_structs/lr1", "parsing_macro/lr1"]
+lr1 = ["lr_rust_shared_structs/lr1", "lr_rust_parsing_macro/lr1"]

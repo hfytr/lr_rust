@@ -64,7 +64,7 @@ fn term_node(factor: Node, mut term: Node) -> Node {
     term
 }
 
-parser::parser! {
+lr_rust::parser! {
     State(()),
     Output(Node),
     Kind(NodeKind),
@@ -100,8 +100,6 @@ fn parse_expression_language() {
     let expr = engine
         .parse(NodeKind::Expr as usize, &s, &mut state)
         .unwrap();
-    dbg!(&expr);
-    dbg!(expr.eval());
     assert_eq!(expr.eval(), 2064);
 }
 
@@ -113,8 +111,6 @@ fn parse_term() {
     let expr = engine
         .parse(NodeKind::Term as usize, &s, &mut state)
         .unwrap();
-    dbg!(&expr);
-    dbg!(expr.eval());
     assert_eq!(expr.eval(), 84);
 }
 
@@ -126,7 +122,5 @@ fn parse_literal() {
     let expr = engine
         .parse(NodeKind::Factor as usize, &s, &mut state)
         .unwrap();
-    println!("{}", expr);
-    dbg!(expr.eval());
     assert_eq!(expr.eval(), 555);
 }

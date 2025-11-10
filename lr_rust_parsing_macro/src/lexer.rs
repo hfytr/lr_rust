@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use shared_structs::{Conflict, ParseTable, Trie, RegexDFA, TrieNode};
+use lr_rust_shared_structs::{Conflict, ParseTable, Trie, RegexDFA, TrieNode};
 use syn::{
     parenthesized,
     parse::{Parse, ParseStream},
