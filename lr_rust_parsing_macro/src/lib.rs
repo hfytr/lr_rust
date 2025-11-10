@@ -315,7 +315,7 @@ fn parser2(input: TokenStream) -> Result<TokenStream, Error> {
         #kind_def
 
         #generated_fn ->
-            Result<lr_rust_shared_structs::Engine<
+            Result<lr_rust::Engine<
                 #out_type,
                 #state_type,
                 >,
@@ -325,7 +325,7 @@ fn parser2(input: TokenStream) -> Result<TokenStream, Error> {
             #lexeme_callback_defs
             #error_callback_defs
             #rule_callback_defs
-            lr_rust_shared_structs::Engine::from_raw(
+            lr_rust::Engine::from_raw(
                 #parser,
                 #regex,
                 #trie,
