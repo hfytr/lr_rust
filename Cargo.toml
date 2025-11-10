@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-shared_structs = { path = "./shared_structs" }
-proc_macro = { path = "./proc_macro" }
+shared_structs = { path = "./shared_structs", version = "0.1.0" }
+proc_macro = { path = "./proc_macro", version = "0.1.0" }
 
 [features]
 lr1 = ["shared_structs/lr1", "proc_macro/lr1"]
