@@ -1,0 +1,11 @@
+[package]
+name = "parser"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+shared_structs = { path = "./shared_structs" }
+proc_macro = { path = "./proc_macro" }
+
+[features]
+lr1 = ["shared_structs/lr1", "proc_macro/lr1"]
