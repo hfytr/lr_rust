@@ -1,8 +1,8 @@
 [package]
-name = "proc_macro"
+name = "parsing_macro"
 version = "0.1.0"
 edition = "2024"
-description = "proc_macro sub library for hfytr's parsing library."
+description = "parsing_macro sub library for hfytr's parsing library."
 license = "MIT"
 
 [lib]
