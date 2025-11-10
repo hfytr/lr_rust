@@ -2,7 +2,7 @@
 name = "proc_macro"
 version = "0.1.0"
 edition = "2024"
-description = ""
+description = "proc_macro sub library for hfytr's parsing library."
 license = "MIT"
 
 [lib]

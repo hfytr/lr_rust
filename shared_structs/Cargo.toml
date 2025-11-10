@@ -2,7 +2,7 @@
 name = "shared_structs"
 version = "0.1.0"
 edition = "2024"
-description = ""
+description = "shared_structs sub library for hfytr's parsing library."
 license = "MIT"
 
 [dependencies]
