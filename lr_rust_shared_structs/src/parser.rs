@@ -287,9 +287,9 @@ fn get_derived_lookaheads(
         } else {
             result[cur] = Some(cur_lookahead.clone());
         }
-        for (i, rule) in rules[cur].iter().enumerate() {
+        for rule in rules[cur].iter() {
             let next_lookahead = rule
-                .get(i + 1)
+                .get(1)
                 .map(|n| &firsts[*n])
                 .unwrap_or(cur_lookahead);
             if result[rule[0]]
