@@ -1,6 +1,6 @@
 [package]
 name = "lr_rust_shared_structs"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "shared_structs sub library for lr_rust."
 license = "MIT"
