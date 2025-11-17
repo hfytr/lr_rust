@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "lr_rust"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "lr_rust_parsing_macro",
  "lr_rust_shared_structs",
