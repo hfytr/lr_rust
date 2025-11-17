@@ -57,6 +57,12 @@ pub struct Lexemes<
     pub s: &'c str,
 }
 
+pub enum NodeKind {
+    Terminal,
+    NonTerminal,
+    Empty,
+}
+
 pub struct Engine<N: Clone, S> {
     parser: ParseTable,
     trie: Trie,
@@ -64,7 +70,6 @@ pub struct Engine<N: Clone, S> {
     lexeme_callbacks: Vec<fn(&mut S, &str) -> Option<(N, usize)>>,
     error_callbacks: Vec<fn(&mut S, Vec<N>) -> N>,
     rule_callbacks: Vec<fn(&mut S, &mut Vec<N>) -> N>,
-    is_terminal: Vec<bool>,
 }
 
 impl<
@@ -82,6 +87,7 @@ impl<
             Vec<(usize, usize)>,
             Vec<Option<(usize, usize)>>,
             Vec<Vec<bool>>,
+            Vec<Option<usize>>,
         ),
         lexer: (
             Vec<[Option<usize>; 256]>,
@@ -91,10 +97,9 @@ impl<
         lexeme_callbacks: Vec<fn(&mut S, &str) -> Option<(N, usize)>>,
         error_callbacks: Vec<fn(&mut S, Vec<N>) -> N>,
         rule_callbacks: Vec<fn(&mut S, &mut Vec<N>) -> N>,
-        is_terminal: Vec<bool>,
     ) -> Result<Self, &'static str> {
         Ok(Self {
-            parser: ParseTable::from_raw(parser.0, parser.1, parser.2, parser.3)?,
+            parser: ParseTable::from_raw(parser.0, parser.1, parser.2, parser.3, parser.4)?,
             trie: Trie::from_raw(trie),
             lexer: RegexTable {
                 trans: lexer.0,
@@ -103,7 +108,6 @@ impl<
             lexeme_callbacks,
             error_callbacks,
             rule_callbacks,
-            is_terminal,
         })
     }
 
@@ -115,12 +119,11 @@ impl<
     ) -> Result<N, &'static str> {
         let node: usize = node.into();
         let mut cur_lexeme = self.lex(&mut s, lex_state);
-        if self.is_terminal[node]
-            && let Ok((Some(_), lexeme_id)) = cur_lexeme.as_ref()
+        if let Ok((Some(_), lexeme_id)) = cur_lexeme.as_ref()
             && node == *lexeme_id
         {
             return Ok(cur_lexeme.unwrap().0.unwrap());
-        } else if self.is_terminal[node] {
+        } else if self.parser.node_to_state[node].is_none() {
             return Err(ERR_SYNTAX_ERR);
         }
         let mut state_stack: Vec<usize> = vec![];

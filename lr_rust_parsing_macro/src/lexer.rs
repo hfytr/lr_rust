@@ -142,7 +142,7 @@ impl Parse for Production {
 
 pub fn process_productions(
     productions: &Vec<Production>,
-) -> (RegexDFA, Trie, ParseTable, Vec<bool>) {
+) -> (RegexDFA, Trie, ParseTable) {
     let mut trie = Trie(vec![TrieNode {
         fin: None,
         children: [None; 256],
@@ -194,6 +194,7 @@ pub fn process_productions(
             (regexi, production_ids, is_token, lexeme_i)
         },
     );
+    let id_productions = production_ids.iter().map(|(s, i)| (*i, *s)).collect::<BTreeMap<_, _>>();
     is_token.resize(production_ids.len(), false);
 
     let mut any_errors = false;
@@ -235,19 +236,18 @@ pub fn process_productions(
         panic!();
     }
     let regex = RegexDFA::from_regexi(regexi.into_iter());
-    let eprint_conflict = |node: usize, rule, item: usize, s| {
-        let item_name = productions
-            .get(item)
-            .map(|p| p.get_name().map(|n| n.1))
-            .unwrap_or(Some("EOF"))
-            .unwrap_or("<Update>");
+    let eprint_conflict = |non_terminal: usize, rule, item: usize, s| {
+        let item_name = id_productions
+            .get(&item)
+            .map(|s| *s)
+            .unwrap_or("EOF");
+        let nt_name = id_productions
+            .get(&non_terminal)
+            .map(|s| *s)
+            .unwrap_or("EOF");
         eprintln!(
             "ERROR: {s} / Reduce conflict on item {} in rule {rule} of production {}",
-            item_name,
-            productions[node]
-                .get_name()
-                .map(|n| n.1)
-                .unwrap_or("<Update>")
+            item_name, nt_name
         )
     };
     let parser = match ParseTable::from_rules(rules, error_ids) {
@@ -263,5 +263,5 @@ pub fn process_productions(
         Ok(parser) => parser,
     };
 
-    (regex, trie, parser, is_token) // + 1 for eof
+    (regex, trie, parser) // + 1 for eof
 }

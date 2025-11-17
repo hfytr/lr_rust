@@ -80,7 +80,6 @@ struct MacroBody {
     trie: Trie,
     productions: Vec<Production>,
     parser: ParseTable,
-    is_token: Vec<bool>,
 }
 
 impl Parse for MacroBody {
@@ -127,7 +126,7 @@ impl Parse for MacroBody {
             input.parse::<Token![,]>().unwrap();
         }
 
-        let (regex, trie, parser, is_token) = process_productions(&productions);
+        let (regex, trie, parser) = process_productions(&productions);
         let tot_span = input.span();
         let out_type = out_type.ok_or(Error::new(tot_span, ERR_NO_OUT_TYPE))?;
         let state_type = state_type.ok_or(Error::new(tot_span, ERR_STATE_NOT_SPECIFIED))?;
@@ -145,7 +144,6 @@ impl Parse for MacroBody {
             productions,
             trie,
             parser,
-            is_token,
         });
         result
     }
@@ -162,12 +160,7 @@ fn parser2(input: TokenStream) -> Result<TokenStream, Error> {
         trie,
         productions,
         parser,
-        is_token,
     } = syn::parse2(input)?;
-
-    let mut is_token_toks = TokenStream::new();
-    is_token_toks.append_separated(is_token.iter(), Punct::new(',', Spacing::Alone));
-    is_token_toks.append_all(quote! { , true });
 
     let make_rule_callback = |maybe_user_callback: Option<&ExprClosure>,
                               num_generated: usize,
@@ -332,7 +325,6 @@ fn parser2(input: TokenStream) -> Result<TokenStream, Error> {
                 vec![#lexeme_callbacks],
                 vec![#error_callbacks],
                 vec![#rule_callbacks],
-                vec![#is_token_toks],
             )
         }
     })
