@@ -1,7 +1,7 @@
-use std::fmt::Debug;
+use std::{collections::BTreeMap, fmt::Debug};
 
 use proc_macro2::{Punct, Spacing, TokenStream};
-use quote::{quote, ToTokens, TokenStreamExt};
+use quote::{ToTokens, TokenStreamExt, quote};
 
 use crate::{
     quote_option,
@@ -62,9 +62,32 @@ pub struct ParseTable {
     pub node_to_state: Vec<Option<usize>>,
 }
 
-pub enum Conflict {
-    RR(usize, usize, usize),
-    SR(usize, usize, usize),
+pub struct Conflict {
+    state_id: usize,
+    state_rules: Vec<SeedRule>,
+    state_lookaheads: Vec<USizeSet>,
+    /// Vec<(token id, true if shift / reduce)>
+    tokens: Vec<(usize, bool)>,
+}
+
+impl Conflict {
+    pub fn pprint(&self, id_to_node: &BTreeMap<usize, &str>) {
+        println!("Parser state {}:", self.state_id);
+        for (rule, lookaheads) in self.state_rules.iter().zip(self.state_lookaheads.iter()) {
+            println!(
+                "\tPosition {} of rule {} of nonterminal {} with lookahead:",
+                rule.pos, rule.rule, id_to_node[&rule.nt]
+            );
+            for lookahead in lookaheads.iter() {
+                println!("\t\t{}", id_to_node[&lookahead]);
+            }
+        }
+        println!("\tConflicts:");
+        for (token, shift_reduce) in self.tokens.iter() {
+            let kind_str = if *shift_reduce { "Shift" } else { "Reduce" };
+            println!("\t\t{}: {} / Reduce", id_to_node[token], kind_str);
+        }
+    }
 }
 
 impl ParseTable {
@@ -92,7 +115,7 @@ impl ParseTable {
             rule_lens,
             errors,
             reductions,
-            node_to_state
+            node_to_state,
         })
     }
 
@@ -133,10 +156,23 @@ impl ParseTable {
         for (i, (state, trans)) in dfa.states.iter().enumerate() {
             let (seeds, lookaheads) = &**state;
             let id = state_ids[i];
+            let mut maybe_conflict: Option<Conflict> = None;
             for (seed, lookahead) in seeds.into_iter().zip(lookaheads.into_iter()) {
                 for (item, next) in trans {
                     if matches!(actions[id][*item], ParseAction::Reduce(_)) {
-                        conflicts.push(Conflict::SR(seed.nt, seed.rule, *item));
+                        match maybe_conflict.as_mut() {
+                            Some(conflict) => {
+                                conflict.tokens.push((*item, true));
+                            }
+                            None => {
+                                maybe_conflict = Some(Conflict {
+                                    state_id: i,
+                                    state_rules: state.0.clone(),
+                                    state_lookaheads: state.1.clone(),
+                                    tokens: vec![(*item, true)],
+                                });
+                            }
+                        }
                     }
                     actions[id][*item] = if dfa.rules[*item].len() == 0 {
                         ParseAction::Shift(state_ids[*next])
@@ -153,12 +189,27 @@ impl ParseTable {
                         if let ParseAction::Reduce(old_prod) = actions[id][item]
                             && old_prod != production
                         {
-                            conflicts.push(Conflict::RR(seed.nt, seed.rule, item));
+                            match maybe_conflict.as_mut() {
+                                Some(conflict) => {
+                                    conflict.tokens.push((item, false));
+                                }
+                                None => {
+                                    maybe_conflict = Some(Conflict {
+                                        state_id: i,
+                                        state_rules: state.0.clone(),
+                                        state_lookaheads: state.1.clone(),
+                                        tokens: vec![(item, false)],
+                                    });
+                                }
+                            }
                         }
                         reductions[seed.nt][item] = true;
                         actions[id][item] = ParseAction::Reduce(production);
                     }
                 }
+            }
+            if let Some(conflict) = maybe_conflict {
+                conflicts.push(conflict);
             }
         }
         conflicts
@@ -288,10 +339,7 @@ fn get_derived_lookaheads(
             result[cur] = Some(cur_lookahead.clone());
         }
         for rule in rules[cur].iter() {
-            let next_lookahead = rule
-                .get(1)
-                .map(|n| &firsts[*n])
-                .unwrap_or(cur_lookahead);
+            let next_lookahead = rule.get(1).map(|n| &firsts[*n]).unwrap_or(cur_lookahead);
             if result[rule[0]]
                 .as_ref()
                 .map(|next_result| !next_lookahead.is_subset(next_result))
@@ -320,19 +368,31 @@ fn get_derived_lookaheads(
 impl ParseDFA {
     fn from_rules(rules: Vec<Vec<Vec<usize>>>) -> Self {
         let firsts = get_firsts(&rules);
-        let node_to_state: Vec<_> = rules.iter().scan(0usize, |state, rule| {
-            if rule.is_empty() {
-                Some(None)
-            } else {
-                *state += 1;
-                Some(Some(*state - 1))
-            }
-        }).collect();
-        let states_vec = rules.iter().enumerate().filter(|(_, rule)| !rule.is_empty())
+        let node_to_state: Vec<_> = rules
+            .iter()
+            .scan(0usize, |state, rule| {
+                if rule.is_empty() {
+                    Some(None)
+                } else {
+                    *state += 1;
+                    Some(Some(*state - 1))
+                }
+            })
+            .collect();
+        let states_vec = rules
+            .iter()
+            .enumerate()
+            .filter(|(_, rule)| !rule.is_empty())
             .map(|(i, rule)| {
                 (
                     (
-                        (0..rule.len()).map(|j| SeedRule {nt: i, rule: j, pos: 0}).collect::<Vec<_>>(),
+                        (0..rule.len())
+                            .map(|j| SeedRule {
+                                nt: i,
+                                rule: j,
+                                pos: 0,
+                            })
+                            .collect::<Vec<_>>(),
                         vec![firsts.last().unwrap().clone(); rule.len()],
                     ),
                     vec![],
@@ -361,7 +421,11 @@ impl ParseDFA {
             let mut trans_seeds = vec![vec![]; rules.len()];
             let mut trans_lookaheads = vec![vec![]; rules.len()];
             for (seed, lookahead) in iter_state() {
-                let new_seed = SeedRule {nt: seed.nt, rule: seed.rule, pos: seed.pos + 1};
+                let new_seed = SeedRule {
+                    nt: seed.nt,
+                    rule: seed.rule,
+                    pos: seed.pos + 1,
+                };
                 let edge = rules[seed.nt][seed.rule][seed.pos];
                 // seeds dont overlap so neither do new seeds
                 trans_seeds[edge].push(new_seed);
@@ -390,8 +454,7 @@ impl ParseDFA {
                     trans_lookaheads[edge][tran] |= derived_lookaheads[i][rule.0].as_ref().unwrap();
                 } else {
                     trans_seeds[edge].push(new_seed);
-                    trans_lookaheads[edge]
-                        .push(derived_lookaheads[i][rule.0].clone().unwrap());
+                    trans_lookaheads[edge].push(derived_lookaheads[i][rule.0].clone().unwrap());
                 }
             }
             let true_tran = trans_seeds
@@ -399,18 +462,24 @@ impl ParseDFA {
                 .zip(trans_lookaheads.into_iter())
                 .enumerate()
                 .filter_map(|(i, state)| {
-                    (state.0.len() > 0).then(|| {
-                        states.get_ind(&state).unwrap_or_else(|| {
-                            let state_id = states.push(state, vec![]).0;
-                            stack.push(state_id);
-                            state_id
+                    (state.0.len() > 0)
+                        .then(|| {
+                            states.get_ind(&state).unwrap_or_else(|| {
+                                let state_id = states.push(state, vec![]).0;
+                                stack.push(state_id);
+                                state_id
+                            })
                         })
-                    }).map(|next| (i, next))
+                        .map(|next| (i, next))
                 })
                 .collect();
             states[cur_state].1 = true_tran;
         }
 
-        Self { rules, states, node_to_state }
+        Self {
+            rules,
+            states,
+            node_to_state,
+        }
     }
 }

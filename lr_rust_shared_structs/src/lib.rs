@@ -6,7 +6,7 @@ use core::panic;
 pub use lexer::{RegexDFA, Trie, TrieNode};
 pub use parser::{Conflict, ParseAction, ParseTable};
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use std::fmt::Debug;
 
 use crate::lexer::RegexTable;
@@ -15,8 +15,7 @@ const ERR_INVALID_LEXEME: &'static str = "The lexing engine hit an invalid seque
 const ERR_REDUCED_NONTERMINAL_INVALID: &'static str =
     "Non-terminal mapped to a non-goto action in the parse-table.";
 const ERR_STATE_STACK_EMPTY: &'static str = "Attempted to pop from an empty state stack.";
-const ERR_STATE_STACK_NOT_EMPTY: &'static str =
-    "The state stack was not empty when returning start rule.";
+const ERR_WRONG_OUTPUT: &'static str = "Parsing resulted in the wrong node type.";
 const ERR_NODE_STACK_NOT_EMPTY: &'static str =
     "The node stack was not empty when returning start rule.";
 const ERR_TERMINAL_GOTO: &'static str = "A terminal mapped to a goto action in the parse table.";
@@ -42,45 +41,22 @@ fn fmt_maybe_arr(f: &mut std::fmt::Formatter<'_>, a: &[Option<usize>; 256]) -> s
     f.write_str("]")
 }
 
-pub struct Lexemes<
-    'a,
-    'b,
-    'c,
-    N: Clone,
-    S,
-> {
-    engine: &'a Engine<
-        N,
-        S,
-    >,
-    pub state: &'b mut S,
-    pub s: &'c str,
-}
-
 pub enum NodeKind {
     Terminal,
     NonTerminal,
     Empty,
 }
 
-pub struct Engine<N: Clone, S> {
+pub struct Engine<N: Clone, St, Sp> {
     parser: ParseTable,
     trie: Trie,
     lexer: RegexTable,
-    lexeme_callbacks: Vec<fn(&mut S, &str) -> Option<(N, usize)>>,
-    error_callbacks: Vec<fn(&mut S, Vec<N>) -> N>,
-    rule_callbacks: Vec<fn(&mut S, &mut Vec<N>) -> N>,
+    lexeme_callbacks: Vec<fn(&mut St, &str) -> Option<(N, Sp, usize)>>,
+    error_callbacks: Vec<fn(&mut St, Vec<(N, Sp)>) -> (N, Sp)>,
+    rule_callbacks: Vec<fn(&mut St, &mut Vec<(N, Sp)>) -> (N, Sp)>,
 }
 
-impl<
-        N: Clone + Debug,
-        S,
-    >
-    Engine<
-        N,
-        S,
-    >
-{
+impl<N: Clone + Debug, St: Debug, Sp: Debug> Engine<N, St, Sp> {
     pub fn from_raw(
         parser: (
             Vec<Vec<(usize, usize)>>,
@@ -89,14 +65,11 @@ impl<
             Vec<Vec<bool>>,
             Vec<Option<usize>>,
         ),
-        lexer: (
-            Vec<[Option<usize>; 256]>,
-            Vec<Option<usize>>,
-        ),
+        lexer: (Vec<[Option<usize>; 256]>, Vec<Option<usize>>),
         trie: Vec<(Option<usize>, [Option<usize>; 256])>,
-        lexeme_callbacks: Vec<fn(&mut S, &str) -> Option<(N, usize)>>,
-        error_callbacks: Vec<fn(&mut S, Vec<N>) -> N>,
-        rule_callbacks: Vec<fn(&mut S, &mut Vec<N>) -> N>,
+        lexeme_callbacks: Vec<fn(&mut St, &str) -> Option<(N, Sp, usize)>>,
+        error_callbacks: Vec<fn(&mut St, Vec<(N, Sp)>) -> (N, Sp)>,
+        rule_callbacks: Vec<fn(&mut St, &mut Vec<(N, Sp)>) -> (N, Sp)>,
     ) -> Result<Self, &'static str> {
         Ok(Self {
             parser: ParseTable::from_raw(parser.0, parser.1, parser.2, parser.3, parser.4)?,
@@ -115,14 +88,14 @@ impl<
         &mut self,
         node: impl Into<usize>,
         mut s: &str,
-        lex_state: &mut S,
+        lex_state: &mut St,
     ) -> Result<N, &'static str> {
         let node: usize = node.into();
         let mut cur_lexeme = self.lex(&mut s, lex_state);
         if let Ok((Some(_), lexeme_id)) = cur_lexeme.as_ref()
             && node == *lexeme_id
         {
-            return Ok(cur_lexeme.unwrap().0.unwrap());
+            return Ok(cur_lexeme.unwrap().0.unwrap().0);
         } else if self.parser.node_to_state[node].is_none() {
             return Err(ERR_SYNTAX_ERR);
         }
@@ -130,6 +103,8 @@ impl<
         state_stack.push(node);
         let mut node_stack = vec![];
         let mut error: Option<usize> = None;
+        let mut result = None;
+        let mut last_type = None;
         while let Ok((lexeme, lexeme_id)) = cur_lexeme.as_ref() {
             if let Some(nonterminal) = error {
                 if self.parser.reductions[nonterminal][*lexeme_id] {
@@ -148,18 +123,23 @@ impl<
             match self.parser.actions[*state_stack.last().unwrap()][*lexeme_id] {
                 ParseAction::Shift(state) => {
                     state_stack.push(state);
-                    if let Ok((Some(lexeme), _)) = cur_lexeme {
-                        node_stack.push(lexeme);
+                    if let Ok((Some((lexeme, span)), _)) = cur_lexeme {
+                        node_stack.push((lexeme, span));
                     }
                     cur_lexeme = self.lex(&mut s, lex_state);
                 }
                 ParseAction::Reduce(rule) => {
                     let (rule_len, non_terminal) = self.parser.rule_lens[rule];
+                    last_type = Some(non_terminal);
                     for _ in 0..rule_len {
                         state_stack.pop().ok_or(ERR_STATE_STACK_EMPTY)?;
                     }
-                    let new_node = (self.rule_callbacks[rule])(lex_state, &mut node_stack);
-                    node_stack.push(new_node);
+                    let (new_node, new_span) =
+                        (self.rule_callbacks[rule])(lex_state, &mut node_stack);
+                    if s.is_empty() && non_terminal == node {
+                        result = Some(node_stack.len());
+                    }
+                    node_stack.push((new_node, new_span));
                     state_stack.push(
                         if let ParseAction::Goto(state) = self.parser.actions
                             [*state_stack.last().ok_or(ERR_STATE_STACK_EMPTY)?][non_terminal]
@@ -170,11 +150,13 @@ impl<
                         } else {
                             return Result::Err(ERR_REDUCED_NONTERMINAL_INVALID);
                         },
-                    )
+                    );
                 }
                 ParseAction::Invalid => {
-                    if error.is_none() {
+                    if error.is_none() && result.is_none() {
                         return Err(ERR_SYNTAX_ERR);
+                    } else if error.is_none() && result.is_some() {
+                        break;
                     }
                     let mut nodes = vec![];
                     let mut err_callback = None;
@@ -199,14 +181,18 @@ impl<
         cur_lexeme?;
         if node_stack.len() != 1 {
             return Result::Err(ERR_NODE_STACK_NOT_EMPTY);
-        } else if state_stack.len() != 1 {
-            return Result::Err(ERR_STATE_STACK_NOT_EMPTY);
+        } else if last_type != Some(node) {
+            return Result::Err(ERR_WRONG_OUTPUT);
         } else {
-            return Result::Ok(node_stack.pop().unwrap());
+            return Result::Ok(node_stack.pop().unwrap().0);
         }
     }
 
-    pub fn lex(&self, s: &mut &str, state: &mut S) -> Result<(Option<N>, usize), &'static str> {
+    pub fn lex(
+        &self,
+        s: &mut &str,
+        state: &mut St,
+    ) -> Result<(Option<(N, Sp)>, usize), &'static str> {
         let mut cur_lexeme = None;
         while cur_lexeme.is_none() {
             if s.is_empty() {
@@ -238,50 +224,7 @@ impl<
             cur_lexeme = (self.lexeme_callbacks[fin])(state, &s[0..len]);
             *s = &s[len..];
         }
-        let (lexeme, id) = cur_lexeme.unwrap();
-        Ok((Some(lexeme), id))
-    }
-
-    pub fn lexemes<'a, 'b, 'c>(
-        &'a self,
-        s: &'c str,
-        state: &'b mut S,
-    ) -> Lexemes<
-        'a,
-        'b,
-        'c,
-        N,
-        S,
-    > {
-        Lexemes {
-            engine: self,
-            s,
-            state,
-        }
-    }
-}
-
-impl<
-        'a,
-        'b,
-        'c,
-        N: Clone + Debug,
-        S,
-    > Iterator
-    for Lexemes<
-        'a,
-        'b,
-        'c,
-        N,
-        S,
-    >
-{
-    type Item = Result<(N, usize), &'static str>;
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.engine.lex(&mut self.s, self.state) {
-            Ok((Some(l), id)) => Some(Ok((l, id))),
-            Ok((None, _)) => None,
-            Err(e) => Some(Err(e)),
-        }
+        let (lexeme, span, id) = cur_lexeme.unwrap();
+        Ok((Some((lexeme, span)), id))
     }
 }

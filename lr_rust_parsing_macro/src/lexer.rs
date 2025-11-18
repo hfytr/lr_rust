@@ -1,10 +1,9 @@
 use std::collections::BTreeMap;
 
-use lr_rust_shared_structs::{Conflict, ParseTable, Trie, RegexDFA, TrieNode};
+use lr_rust_shared_structs::{ParseTable, RegexDFA, Trie, TrieNode};
 use syn::{
-    parenthesized,
+    Error, ExprClosure, Ident, LitStr, Token, parenthesized,
     parse::{Parse, ParseStream},
-    Error, ExprClosure, Ident, LitStr, Token,
 };
 
 use crate::Context;
@@ -140,9 +139,7 @@ impl Parse for Production {
     }
 }
 
-pub fn process_productions(
-    productions: &Vec<Production>,
-) -> (RegexDFA, Trie, ParseTable) {
+pub fn process_productions(productions: &Vec<Production>) -> (RegexDFA, Trie, ParseTable) {
     let mut trie = Trie(vec![TrieNode {
         fin: None,
         children: [None; 256],
@@ -194,7 +191,9 @@ pub fn process_productions(
             (regexi, production_ids, is_token, lexeme_i)
         },
     );
-    let id_productions = production_ids.iter().map(|(s, i)| (*i, *s)).collect::<BTreeMap<_, _>>();
+    let id_productions = std::iter::once((production_ids.len(), "EOF"))
+        .chain(production_ids.iter().map(|(s, i)| (*i, *s)))
+        .collect::<BTreeMap<_, _>>();
     is_token.resize(production_ids.len(), false);
 
     let mut any_errors = false;
@@ -236,28 +235,9 @@ pub fn process_productions(
         panic!();
     }
     let regex = RegexDFA::from_regexi(regexi.into_iter());
-    let eprint_conflict = |non_terminal: usize, rule, item: usize, s| {
-        let item_name = id_productions
-            .get(&item)
-            .map(|s| *s)
-            .unwrap_or("EOF");
-        let nt_name = id_productions
-            .get(&non_terminal)
-            .map(|s| *s)
-            .unwrap_or("EOF");
-        eprintln!(
-            "ERROR: {s} / Reduce conflict on item {} in rule {rule} of production {}",
-            item_name, nt_name
-        )
-    };
     let parser = match ParseTable::from_rules(rules, error_ids) {
         Err(conflicts) => {
-            for conflict in conflicts {
-                match conflict {
-                    Conflict::RR(node, rule, item) => eprint_conflict(node, rule, item, "Reduce"),
-                    Conflict::SR(node, rule, item) => eprint_conflict(node, rule, item, "Shift"),
-                }
-            }
+            conflicts.iter().for_each(|c| c.pprint(&id_productions));
             panic!();
         }
         Ok(parser) => parser,

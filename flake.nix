@@ -20,6 +20,7 @@
           nativeBuildInputs = [
             pkg-config
             rustpkg
+            cargo-expand
           ];
           LD_LIBRARY_PATH = "${lib.makeLibraryPath nativeBuildInputs}";
           RUST_BACKTRACE = 1;

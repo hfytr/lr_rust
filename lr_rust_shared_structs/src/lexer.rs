@@ -4,7 +4,7 @@ use crate::{
     sets::{IndexableMap, USizeSet},
 };
 use proc_macro2::{Punct, Spacing, TokenStream};
-use quote::{quote, ToTokens, TokenStreamExt};
+use quote::{ToTokens, TokenStreamExt, quote};
 use std::{collections::BTreeMap, fmt::Debug, rc::Rc};
 
 #[derive(Clone, Copy)]
@@ -45,16 +45,18 @@ impl ToTokens for TrieNode {
     }
 }
 
-
 #[derive(Debug)]
 pub struct Trie(pub Vec<TrieNode>);
 
 impl Trie {
     pub fn from_raw(trie_raw: Vec<(Option<usize>, [Option<usize>; 256])>) -> Self {
-        let mut nodes = vec![TrieNode {
-            fin: None,
-            children: [None; 256],
-        }; trie_raw.len()];
+        let mut nodes = vec![
+            TrieNode {
+                fin: None,
+                children: [None; 256],
+            };
+            trie_raw.len()
+        ];
         for (i, (fin, children)) in trie_raw.into_iter().enumerate() {
             nodes[i] = TrieNode { fin, children };
         }
