@@ -63,7 +63,7 @@ pub fn parser(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         Result::Ok(output) => output.into(),
         Result::Err(err) => {
             eprintln!("{}", err);
-            exit(69);
+            exit(1);
         }
     }
 }
@@ -89,6 +89,7 @@ struct MacroBody {
     productions: Vec<Production>,
     parser: ParseTable,
     span: (TokenStream, TokenStream, TokenStream),
+    id_productions: TokenStream,
 }
 
 impl Parse for MacroBody {
@@ -152,7 +153,14 @@ impl Parse for MacroBody {
             input.parse::<Token![,]>().unwrap();
         }
 
-        let (regex, trie, parser) = process_productions(&productions);
+        let (regex, trie, parser, id_productions_raw) = process_productions(&productions);
+        let mut id_productions = TokenStream::new();
+        id_productions.append_separated(
+            id_productions_raw
+                .into_iter()
+                .map(|p| syn::LitStr::new(&p, Span::call_site())),
+            Punct::new(',', Spacing::Alone),
+        );
         let tot_span = input.span();
         let out_type = out_type.ok_or(Error::new(tot_span, ERR_NO_OUT_TYPE))?;
         let state_type = state_type.ok_or(Error::new(tot_span, ERR_STATE_NOT_SPECIFIED))?;
@@ -180,6 +188,7 @@ impl Parse for MacroBody {
             trie,
             parser,
             span,
+            id_productions,
         });
         result
     }
@@ -196,6 +205,7 @@ fn parser2(input: TokenStream) -> Result<TokenStream, Error> {
         trie,
         productions,
         parser,
+        id_productions,
         span: (span_type, span_init, span_update),
     } = syn::parse2(input)?;
 
@@ -373,6 +383,7 @@ fn parser2(input: TokenStream) -> Result<TokenStream, Error> {
                 vec![#lexeme_callbacks],
                 vec![#error_callbacks],
                 vec![#rule_callbacks],
+                vec![#id_productions]
             )
         }
     })

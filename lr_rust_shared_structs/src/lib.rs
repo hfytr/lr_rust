@@ -7,7 +7,10 @@ pub use lexer::{RegexDFA, Trie, TrieNode};
 pub use parser::{Conflict, ParseAction, ParseTable};
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
-use std::fmt::Debug;
+use std::{
+    fmt::Debug,
+    io::{BufWriter, Write},
+};
 
 use crate::lexer::RegexTable;
 
@@ -20,6 +23,8 @@ const ERR_NODE_STACK_NOT_EMPTY: &'static str =
     "The node stack was not empty when returning start rule.";
 const ERR_TERMINAL_GOTO: &'static str = "A terminal mapped to a goto action in the parse table.";
 const ERR_SYNTAX_ERR: &'static str = "Syntax error.";
+const ERR_OPEN_LOG: &'static str = "Error opening log file, \"lr_rust.log\".";
+const ERR_IO: &'static str = "Error writing to log file, \"lr_rust.log\".";
 
 fn quote_option<T: ToTokens>(o: &Option<T>) -> TokenStream {
     if let Some(t) = o {
@@ -51,6 +56,7 @@ pub struct Engine<N: Clone, St, Sp> {
     parser: ParseTable,
     trie: Trie,
     lexer: RegexTable,
+    id_productions: Vec<&'static str>,
     lexeme_callbacks: Vec<fn(&mut St, &str) -> Option<(N, Sp, usize)>>,
     error_callbacks: Vec<fn(&mut St, Vec<(N, Sp)>) -> (N, Sp)>,
     rule_callbacks: Vec<fn(&mut St, &mut Vec<(N, Sp)>) -> (N, Sp)>,
@@ -70,6 +76,7 @@ impl<N: Clone + Debug, St: Debug, Sp: Debug> Engine<N, St, Sp> {
         lexeme_callbacks: Vec<fn(&mut St, &str) -> Option<(N, Sp, usize)>>,
         error_callbacks: Vec<fn(&mut St, Vec<(N, Sp)>) -> (N, Sp)>,
         rule_callbacks: Vec<fn(&mut St, &mut Vec<(N, Sp)>) -> (N, Sp)>,
+        id_productions: Vec<&'static str>,
     ) -> Result<Self, &'static str> {
         Ok(Self {
             parser: ParseTable::from_raw(parser.0, parser.1, parser.2, parser.3, parser.4)?,
@@ -81,6 +88,7 @@ impl<N: Clone + Debug, St: Debug, Sp: Debug> Engine<N, St, Sp> {
             lexeme_callbacks,
             error_callbacks,
             rule_callbacks,
+            id_productions,
         })
     }
 
@@ -105,7 +113,21 @@ impl<N: Clone + Debug, St: Debug, Sp: Debug> Engine<N, St, Sp> {
         let mut error: Option<usize> = None;
         let mut result = None;
         let mut last_type = None;
+        let log_file = std::fs::File::options()
+            .create(true)
+            .append(true)
+            .open("lr_rust.log")
+            .map_err(|_| ERR_OPEN_LOG)?;
+        let mut writer = BufWriter::new(log_file);
+        writeln!(writer, "-- PARSER ACTIONS --").map_err(|_| ERR_IO)?;
         while let Ok((lexeme, lexeme_id)) = cur_lexeme.as_ref() {
+            writeln!(&mut writer, "State stack: {:?}", state_stack).map_err(|_| ERR_IO)?;
+            writeln!(
+                &mut writer,
+                "Looking at token {}",
+                self.id_productions[*lexeme_id]
+            )
+            .map_err(|_| ERR_IO)?;
             if let Some(nonterminal) = error {
                 if self.parser.reductions[nonterminal][*lexeme_id] {
                     error = None;
@@ -122,6 +144,7 @@ impl<N: Clone + Debug, St: Debug, Sp: Debug> Engine<N, St, Sp> {
             }
             match self.parser.actions[*state_stack.last().unwrap()][*lexeme_id] {
                 ParseAction::Shift(state) => {
+                    writeln!(&mut writer, "Shifted state {}", state).map_err(|_| ERR_IO)?;
                     state_stack.push(state);
                     if let Ok((Some((lexeme, span)), _)) = cur_lexeme {
                         node_stack.push((lexeme, span));
@@ -130,6 +153,12 @@ impl<N: Clone + Debug, St: Debug, Sp: Debug> Engine<N, St, Sp> {
                 }
                 ParseAction::Reduce(rule) => {
                     let (rule_len, non_terminal) = self.parser.rule_lens[rule];
+                    writeln!(
+                        &mut writer,
+                        "Reducing {} tokens to {}.",
+                        rule_len, self.id_productions[non_terminal]
+                    )
+                    .map_err(|_| ERR_IO)?;
                     last_type = Some(non_terminal);
                     for _ in 0..rule_len {
                         state_stack.pop().ok_or(ERR_STATE_STACK_EMPTY)?;
@@ -153,7 +182,14 @@ impl<N: Clone + Debug, St: Debug, Sp: Debug> Engine<N, St, Sp> {
                     );
                 }
                 ParseAction::Invalid => {
+                    writeln!(
+                        &mut writer,
+                        "Syntax Error. Final State stack: {:?}",
+                        state_stack
+                    )
+                    .map_err(|_| ERR_IO)?;
                     if error.is_none() && result.is_none() {
+                        writer.flush().map_err(|_| ERR_IO)?;
                         return Err(ERR_SYNTAX_ERR);
                     } else if error.is_none() && result.is_some() {
                         break;
@@ -178,6 +214,7 @@ impl<N: Clone + Debug, St: Debug, Sp: Debug> Engine<N, St, Sp> {
                 ParseAction::Goto(_) => return Result::Err(ERR_TERMINAL_GOTO),
             }
         }
+        writer.flush().map_err(|_| ERR_IO)?;
         cur_lexeme?;
         if node_stack.len() != 1 {
             return Result::Err(ERR_NODE_STACK_NOT_EMPTY);

@@ -1,4 +1,5 @@
-use std::{collections::BTreeMap, fmt::Debug};
+use std::fmt::Debug;
+use std::io::Write;
 
 use proc_macro2::{Punct, Spacing, TokenStream};
 use quote::{ToTokens, TokenStreamExt, quote};
@@ -71,21 +72,21 @@ pub struct Conflict {
 }
 
 impl Conflict {
-    pub fn pprint(&self, id_to_node: &BTreeMap<usize, &str>) {
+    pub fn pprint(&self, id_to_node: &Vec<String>) {
         println!("Parser state {}:", self.state_id);
         for (rule, lookaheads) in self.state_rules.iter().zip(self.state_lookaheads.iter()) {
             println!(
                 "\tPosition {} of rule {} of nonterminal {} with lookahead:",
-                rule.pos, rule.rule, id_to_node[&rule.nt]
+                rule.pos, rule.rule, id_to_node[rule.nt]
             );
             for lookahead in lookaheads.iter() {
-                println!("\t\t{}", id_to_node[&lookahead]);
+                println!("\t\t{}", id_to_node[lookahead]);
             }
         }
         println!("\tConflicts:");
         for (token, shift_reduce) in self.tokens.iter() {
             let kind_str = if *shift_reduce { "Shift" } else { "Reduce" };
-            println!("\t\t{}: {} / Reduce", id_to_node[token], kind_str);
+            println!("\t\t{}: {} / Reduce", id_to_node[*token], kind_str);
         }
     }
 }
@@ -122,7 +123,7 @@ impl ParseTable {
     pub fn from_rules(
         rules: Vec<Vec<Vec<usize>>>,
         error_callbacks: Vec<Option<usize>>,
-    ) -> Result<Self, Vec<Conflict>> {
+    ) -> (Result<Self, Vec<Conflict>>, ParseDFA) {
         let dfa = ParseDFA::from_rules(rules);
         let mut conflicts = vec![];
         #[cfg(not(feature = "lr1"))]
@@ -212,16 +213,18 @@ impl ParseTable {
                 conflicts.push(conflict);
             }
         }
-        conflicts
-            .is_empty()
-            .then_some(Self {
+        let parser = if conflicts.is_empty() {
+            Ok(Self {
                 actions,
                 rule_lens,
                 reductions,
                 errors,
-                node_to_state: dfa.node_to_state,
+                node_to_state: dfa.node_to_state.clone(),
             })
-            .ok_or(conflicts)
+        } else {
+            Err(conflicts)
+        };
+        (parser, dfa)
     }
 }
 
@@ -257,7 +260,7 @@ impl ToTokens for ParseTable {
 }
 
 #[derive(Debug)]
-struct ParseDFA {
+pub struct ParseDFA {
     states: IndexableMap<(Vec<SeedRule>, Vec<USizeSet>), Vec<(usize, usize)>>,
     rules: Vec<Vec<Vec<usize>>>,
     node_to_state: Vec<Option<usize>>,
@@ -325,6 +328,7 @@ fn get_derived_lookaheads(
     seed_lookahead: &USizeSet,
     firsts: &Vec<USizeSet>,
     rules: &Vec<Vec<Vec<usize>>>,
+    debug: bool,
 ) -> Vec<Option<USizeSet>> {
     fn helper(
         cur: usize,
@@ -332,6 +336,7 @@ fn get_derived_lookaheads(
         firsts: &Vec<USizeSet>,
         result: &mut Vec<Option<USizeSet>>,
         rules: &Vec<Vec<Vec<usize>>>,
+        debug: bool
     ) {
         if let Some(ref mut cur_result) = result[cur] {
             *cur_result |= cur_lookahead
@@ -346,7 +351,7 @@ fn get_derived_lookaheads(
                 .unwrap_or(true)
                 && rules[rule[0]].len() > 0
             {
-                helper(rule[0], &next_lookahead, firsts, result, rules);
+                helper(rule[0], &next_lookahead, firsts, result, rules, debug);
             }
         }
     }
@@ -361,6 +366,7 @@ fn get_derived_lookaheads(
         firsts,
         &mut result,
         rules,
+        debug,
     );
     result
 }
@@ -432,7 +438,7 @@ impl ParseDFA {
                 trans_lookaheads[edge].push(lookahead.clone());
             }
             let derived_lookaheads = iter_state()
-                .map(|(seed, lookahead)| get_derived_lookaheads(seed, &lookahead, &firsts, &rules))
+                .map(|(seed, lookahead)| get_derived_lookaheads(seed, &lookahead, &firsts, &rules, cur_state == 1422))
                 .collect::<Vec<_>>();
             for (i, rule) in iter_state().enumerate().flat_map(|(i, (seed, _))| {
                 derived_rules[rules[seed.nt][seed.rule][seed.pos]]
@@ -481,5 +487,40 @@ impl ParseDFA {
             states,
             node_to_state,
         }
+    }
+
+    pub fn write_to_file(&self, f: &mut std::fs::File, id_productions: &Vec<String>) -> std::io::Result<()> {
+        for (i, (seeds, trans)) in self.states.iter().enumerate() {
+            let lookaheads = &seeds.1;
+            let seeds = &seeds.0;
+            writeln!(f, "-- STATE {} --", i)?;
+            writeln!(f, "  state rules")?;
+            for (seed, lookahead) in seeds.iter().zip(lookaheads.iter()) {
+                write!(f, "    {} =>", id_productions[seed.nt])?;
+                for (j, symbol) in self.rules[seed.nt][seed.rule].iter().enumerate() {
+                    if j == seed.pos{
+                        write!(f, " |")?;
+                    }
+                    write!(f, " {}", id_productions[*symbol])?;
+                }
+                write!(f, " [")?;
+                for (j, symbol) in lookahead.iter().enumerate() {
+                    if j != 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", id_productions[symbol])?;
+                }
+                writeln!(f, "],")?;
+            }
+            writeln!(f, "  transitions")?;
+            for (symbol, next) in trans.iter() {
+                writeln!(f, "    {} => {}", id_productions[*symbol], next)?;
+            }
+            if trans.is_empty() {
+                writeln!(f, "    None")?;
+            }
+            writeln!(f, "")?;
+        }
+        Ok(())
     }
 }
