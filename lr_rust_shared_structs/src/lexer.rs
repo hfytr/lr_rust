@@ -163,7 +163,6 @@ pub struct RegexDFA {
 
 impl Debug for RegexDFA {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        println!("{:?}", '\n');
         write!(f, "RegexTable {{")?;
         for (i, tran) in self.trans.iter().enumerate() {
             if let Some(fin) = self.fin[i] {
@@ -294,7 +293,6 @@ struct NFA {
 
 impl Debug for NFA {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        println!("{:?}", '\n');
         write!(f, "NFA {{")?;
         for (i, tran) in self.edges.iter().enumerate() {
             write!(f, "\n    State {i}: ")?;
