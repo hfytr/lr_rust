@@ -36,11 +36,7 @@ fn quote_option<T: ToTokens>(o: &Option<T>) -> TokenStream {
 
 fn fmt_maybe_arr(f: &mut std::fmt::Formatter<'_>, a: &[Option<usize>; 256]) -> std::fmt::Result {
     f.write_str("[")?;
-    for (i, e) in a
-        .iter()
-        .enumerate()
-        .filter_map(|(i, maybe_e)| maybe_e.map(|e| (i, e)))
-    {
+    for (i, e) in a.iter().enumerate().filter_map(|(i, maybe_e)| maybe_e.map(|e| (i, e))) {
         write!(f, "{}: {:?}, ", i, e)?
     }
     f.write_str("]")
@@ -81,10 +77,7 @@ impl<N: Clone + Debug, St: Debug, Sp: Debug> Engine<N, St, Sp> {
         Ok(Self {
             parser: ParseTable::from_raw(parser.0, parser.1, parser.2, parser.3, parser.4)?,
             trie: Trie::from_raw(trie),
-            lexer: RegexTable {
-                trans: lexer.0,
-                fin: lexer.1,
-            },
+            lexer: RegexTable { trans: lexer.0, fin: lexer.1 },
             lexeme_callbacks,
             error_callbacks,
             rule_callbacks,
@@ -113,21 +106,13 @@ impl<N: Clone + Debug, St: Debug, Sp: Debug> Engine<N, St, Sp> {
         let mut error: Option<usize> = None;
         let mut result = None;
         let mut last_type = None;
-        let log_file = std::fs::File::options()
-            .create(true)
-            .append(true)
-            .open("lr_rust.log")
-            .map_err(|_| ERR_OPEN_LOG)?;
+        let log_file = std::fs::File::create("lr_rust.log").map_err(|_| ERR_OPEN_LOG)?;
         let mut writer = BufWriter::new(log_file);
         writeln!(writer, "-- PARSER ACTIONS --").map_err(|_| ERR_IO)?;
         while let Ok((lexeme, lexeme_id)) = cur_lexeme.as_ref() {
             writeln!(&mut writer, "State stack: {:?}", state_stack).map_err(|_| ERR_IO)?;
-            writeln!(
-                &mut writer,
-                "Looking at token {}",
-                self.id_productions[*lexeme_id]
-            )
-            .map_err(|_| ERR_IO)?;
+            writeln!(&mut writer, "Looking at token {}", self.id_productions[*lexeme_id])
+                .map_err(|_| ERR_IO)?;
             if let Some(nonterminal) = error {
                 if self.parser.reductions[nonterminal][*lexeme_id] {
                     error = None;
@@ -182,12 +167,8 @@ impl<N: Clone + Debug, St: Debug, Sp: Debug> Engine<N, St, Sp> {
                     );
                 }
                 ParseAction::Invalid => {
-                    writeln!(
-                        &mut writer,
-                        "Syntax Error. Final State stack: {:?}",
-                        state_stack
-                    )
-                    .map_err(|_| ERR_IO)?;
+                    writeln!(&mut writer, "Syntax Error. Final State stack: {:?}", state_stack)
+                        .map_err(|_| ERR_IO)?;
                     if error.is_none() && result.is_none() {
                         writer.flush().map_err(|_| ERR_IO)?;
                         return Err(ERR_SYNTAX_ERR);
@@ -207,9 +188,8 @@ impl<N: Clone + Debug, St: Debug, Sp: Debug> Engine<N, St, Sp> {
                         nodes.push(node_stack.pop().unwrap());
                         state_stack.pop();
                     }
-                    node_stack.push((self.error_callbacks[err_callback.unwrap()])(
-                        lex_state, nodes,
-                    ));
+                    node_stack
+                        .push((self.error_callbacks[err_callback.unwrap()])(lex_state, nodes));
                 }
                 ParseAction::Goto(_) => return Result::Err(ERR_TERMINAL_GOTO),
             }

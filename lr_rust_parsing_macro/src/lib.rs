@@ -15,6 +15,8 @@ const ERR_STATE_NOT_SPECIFIED: &'static str =
     "ERROR: You must specify the lexer state with State(...)";
 const ERR_KIND_NOT_SPECIFIED: &'static str =
     "ERROR: You must specify the lexer kind with Kind(...)";
+const ERR_ENUM_NOT_SPECIFIED: &'static str =
+    "ERROR: You must specify the lexer enum with Enum(...)";
 const ERR_SPAN_NOT_SPECIFIED: &'static str = "ERROR: You must specify the span with Span(...)";
 const ERR_MISSING_STATE_TYPE: &'static str =
     "ERROR: Expected parenthesized lexer state type after State element.";
@@ -84,6 +86,9 @@ struct MacroBody {
     generated_fn: TokenStream,
     kind_def: TokenStream,
     kind_type: Type,
+    enum_def: TokenStream,
+    #[allow(unused)]
+    enum_type: Type,
     regex: RegexDFA,
     trie: Trie,
     productions: Vec<Production>,
@@ -99,13 +104,15 @@ impl Parse for MacroBody {
         let mut state_type = None;
         let mut kind_type = None;
         let mut kind_vis = None;
+        let mut enum_type = None;
+        let mut enum_vis = None;
         let mut generated_fn_vis = None;
         let mut generated_fn_name = None;
         let mut span = None;
         while !input.is_empty() {
             let fork = input.fork();
             if let Result::Ok(ident) = fork.parse::<Ident>()
-                && ["GeneratedFn", "Kind", "State", "Output", "Span"]
+                && ["GeneratedFn", "Kind", "State", "Output", "Span", "Enum"]
                     .contains(&ident.to_string().as_str())
             {
                 input.advance_to(&fork);
@@ -126,6 +133,12 @@ impl Parse for MacroBody {
                         syn::parenthesized!(content in input);
                         kind_vis = content.parse::<Visibility>().ok();
                         kind_type = Some(content.parse::<Type>().context(ERR_MISSING_OUT_TYPE)?);
+                    }
+                    "Enum" => {
+                        let content;
+                        syn::parenthesized!(content in input);
+                        enum_vis = content.parse::<Visibility>().ok();
+                        enum_type = Some(content.parse::<Type>().context(ERR_MISSING_OUT_TYPE)?);
                     }
                     "GeneratedFn" => {
                         let content;
@@ -156,32 +169,29 @@ impl Parse for MacroBody {
         let (regex, trie, parser, id_productions_raw) = process_productions(&productions);
         let mut id_productions = TokenStream::new();
         id_productions.append_separated(
-            id_productions_raw
-                .into_iter()
-                .map(|p| syn::LitStr::new(&p, Span::call_site())),
+            id_productions_raw.into_iter().map(|p| syn::LitStr::new(&p, Span::call_site())),
             Punct::new(',', Spacing::Alone),
         );
         let tot_span = input.span();
         let out_type = out_type.ok_or(Error::new(tot_span, ERR_NO_OUT_TYPE))?;
         let state_type = state_type.ok_or(Error::new(tot_span, ERR_STATE_NOT_SPECIFIED))?;
         let kind_type = kind_type.ok_or(Error::new(tot_span, ERR_KIND_NOT_SPECIFIED))?;
+        let enum_type = enum_type.ok_or(Error::new(tot_span, ERR_ENUM_NOT_SPECIFIED))?;
         let generated_fn_name =
             generated_fn_name.ok_or(Error::new(tot_span, ERR_GEN_FN_NOT_SPECIFIED))?;
-        let span = span
-            .ok_or(Error::new(tot_span, ERR_SPAN_NOT_SPECIFIED))
-            .map(|(st, init, update)| {
-                (
-                    st.to_token_stream(),
-                    init.to_token_stream(),
-                    update.to_token_stream(),
-                )
-            })?;
+        let span = span.ok_or(Error::new(tot_span, ERR_SPAN_NOT_SPECIFIED)).map(
+            |(st, init, update)| {
+                (st.to_token_stream(), init.to_token_stream(), update.to_token_stream())
+            },
+        )?;
 
         let result = Ok(Self {
             out_type: quote! { #out_type },
             state_type: quote! { #state_type },
             kind_def: quote! { #kind_vis enum #kind_type },
-            kind_type: kind_type,
+            kind_type,
+            enum_def: quote! { #enum_vis enum #enum_type },
+            enum_type,
             generated_fn: quote! {#generated_fn_vis fn #generated_fn_name() },
             regex,
             productions,
@@ -200,12 +210,14 @@ fn parser2(input: TokenStream) -> Result<TokenStream, Error> {
         out_type,
         kind_type,
         kind_def,
+        enum_def,
         generated_fn,
         regex,
         trie,
         productions,
         parser,
         id_productions,
+        enum_type: _,
         span: (span_type, span_init, span_update),
     } = syn::parse2(input)?;
 
@@ -214,22 +226,19 @@ fn parser2(input: TokenStream) -> Result<TokenStream, Error> {
                               num_args: usize|
      -> (TokenStream, Ident) {
         let callback_name = Ident::new(&format!("__gen_{}", num_generated), Span::call_site());
-        let user_callback = maybe_user_callback
-            .map(|c| c.to_token_stream())
-            .unwrap_or_else(|| {
-                let mut closure_args = quote! { node_1 };
-                for _ in 0..(num_args - 1) {
-                    closure_args.append_all(quote! {, _});
-                }
-                quote! { |_, _, #closure_args| node_1 }
-            });
+        let user_callback = maybe_user_callback.map(|c| c.to_token_stream()).unwrap_or_else(|| {
+            let mut closure_args = quote! { node_1 };
+            for _ in 0..(num_args - 1) {
+                closure_args.append_all(quote! {, _});
+            }
+            quote! { |_, _, #closure_args| node_1 }
+        });
 
         let callback_args_rev = (0..num_args)
             .map(|i| Ident::new(&format!("node_{}", num_args - i), user_callback.span()))
             .collect::<Vec<_>>();
-        let stack_pops_iter = callback_args_rev
-            .iter()
-            .map(|s| quote! { let #s = node_stack.pop().unwrap(); });
+        let stack_pops_iter =
+            callback_args_rev.iter().map(|s| quote! { let #s = node_stack.pop().unwrap(); });
         let span_var = Ident::new("span", Span::call_site());
         let span_update_var = Ident::new("span_update", Span::call_site());
         let span_update_iter = callback_args_rev.iter().map(|s| {
@@ -336,33 +345,33 @@ fn parser2(input: TokenStream) -> Result<TokenStream, Error> {
         Punct::new(',', Spacing::Alone),
     );
 
-    let kinds = productions
+    let (kinds, variants): (Vec<_>, Vec<_>) = productions
         .iter()
         .scan(BTreeSet::new(), |seen, prod| {
-            if let Some((name, name_raw)) = prod.get_name()
+            if let Some((variant, name_raw)) = prod.get_variant()
                 && !seen.contains(name_raw)
             {
                 seen.insert(name_raw);
-                return Some(Some(name));
+                return Some(Some((&variant.ident, variant)));
             }
             return Some(None);
         })
         .filter_map(|k| k)
-        .collect::<Vec<_>>();
-    let kind_def = quote! {
-        #[derive(Clone, Copy, Debug)]
-        #[repr(u16)]
-        #kind_def { #(#kinds),* }
+        .unzip();
 
+    Ok(quote! {
+        #[derive(Clone, Copy, Debug)]
+        #[allow(dead_code)]
+        #kind_def { #(#kinds),* }
         impl Into<usize> for #kind_type {
             fn into(self) -> usize {
                 self as usize
             }
         }
-    };
 
-    Ok(quote! {
-        #kind_def
+        #[derive(Clone, Debug)]
+        #[allow(dead_code)]
+        #enum_def { #(#variants),* }
 
         #generated_fn ->
             Result<lr_rust::Engine<

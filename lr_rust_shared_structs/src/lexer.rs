@@ -50,13 +50,7 @@ pub struct Trie(pub Vec<TrieNode>);
 
 impl Trie {
     pub fn from_raw(trie_raw: Vec<(Option<usize>, [Option<usize>; 256])>) -> Self {
-        let mut nodes = vec![
-            TrieNode {
-                fin: None,
-                children: [None; 256],
-            };
-            trie_raw.len()
-        ];
+        let mut nodes = vec![TrieNode { fin: None, children: [None; 256] }; trie_raw.len()];
         for (i, (fin, children)) in trie_raw.into_iter().enumerate() {
             nodes[i] = TrieNode { fin, children };
         }
@@ -86,10 +80,7 @@ impl Trie {
         for c in s {
             cur = self.0[cur].children[*c as usize].unwrap_or_else(|| {
                 self.0[cur].children[*c as usize] = Some(self.0.len());
-                self.0.push(TrieNode {
-                    fin: None,
-                    children: [None; 256],
-                });
+                self.0.push(TrieNode { fin: None, children: [None; 256] });
                 self.0.len() - 1
             });
         }
@@ -222,9 +213,7 @@ impl RegexDFA {
                 let base_state_ind = res.states.get_ind(&new_state).unwrap_or_else(|| {
                     stack.push(res.states.len());
                     res.fin.push(
-                        new_state
-                            .iter()
-                            .fold(None, |acc, nfa_state| acc.or(nfa.fin[nfa_state])),
+                        new_state.iter().fold(None, |acc, nfa_state| acc.or(nfa.fin[nfa_state])),
                     );
                     res.states.push(new_state, Empty()).0
                 });
@@ -259,11 +248,7 @@ impl RegexDFA {
     }
 
     pub fn from_raw(raw: RegexTable) -> Self {
-        Self {
-            states: IndexableMap::from([]),
-            trans: raw.trans.to_vec(),
-            fin: raw.fin.to_vec(),
-        }
+        Self { states: IndexableMap::from([]), trans: raw.trans.to_vec(), fin: raw.fin.to_vec() }
     }
 }
 

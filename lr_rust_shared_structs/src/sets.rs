@@ -190,9 +190,7 @@ where
 
     pub fn to_vec(self) -> Vec<(T, U)> {
         let IndexableMap { vec, .. } = self;
-        vec.into_iter()
-            .map(|(t, u)| (Rc::try_unwrap(t).ok().unwrap(), u))
-            .collect()
+        vec.into_iter().map(|(t, u)| (Rc::try_unwrap(t).ok().unwrap(), u)).collect()
     }
 }
 

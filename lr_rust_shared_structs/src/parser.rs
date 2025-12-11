@@ -23,7 +23,7 @@ struct SeedRule {
     pos: usize,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum ParseAction {
     Shift(usize),
     Goto(usize),
@@ -111,13 +111,7 @@ impl ParseTable {
                 };
             }
         }
-        Ok(Self {
-            actions,
-            rule_lens,
-            errors,
-            reductions,
-            node_to_state,
-        })
+        Ok(Self { actions, rule_lens, errors, reductions, node_to_state })
     }
 
     pub fn from_rules(
@@ -187,8 +181,9 @@ impl ParseTable {
                 if seed.pos == dfa.rules[seed.nt][seed.rule].len() {
                     for item in lookahead.iter() {
                         let production = production_ids[seed.nt][seed.rule];
-                        if let ParseAction::Reduce(old_prod) = actions[id][item]
-                            && old_prod != production
+                        let new_action = ParseAction::Reduce(production);
+                        if actions[id][item] != ParseAction::Invalid
+                            && actions[id][item] != new_action
                         {
                             match maybe_conflict.as_mut() {
                                 Some(conflict) => {
@@ -199,13 +194,16 @@ impl ParseTable {
                                         state_id: i,
                                         state_rules: state.0.clone(),
                                         state_lookaheads: state.1.clone(),
-                                        tokens: vec![(item, false)],
+                                        tokens: vec![(
+                                            item,
+                                            matches!(actions[id][item], ParseAction::Shift(_)),
+                                        )],
                                     });
                                 }
                             }
                         }
                         reductions[seed.nt][item] = true;
-                        actions[id][item] = ParseAction::Reduce(production);
+                        actions[id][item] = new_action;
                     }
                 }
             }
@@ -251,9 +249,7 @@ impl ToTokens for ParseTable {
         let reductions = quote_2d(&self.reductions);
         let quote_pair = |(x, y): &(usize, usize)| quote! { (#x, #y) };
         let rule_lens = quote_1d(&self.rule_lens, quote_pair);
-        let errors = quote_1d(&self.errors, |error| {
-            quote_option(&error.map(|e| quote_pair(&e)))
-        });
+        let errors = quote_1d(&self.errors, |error| quote_option(&error.map(|e| quote_pair(&e))));
         let node_to_state = quote_1d(&self.node_to_state, quote_option);
         tokens.append_all(quote! { (#actions, #rule_lens, #errors, #reductions, #node_to_state) });
     }
@@ -279,10 +275,8 @@ fn get_firsts(rules: &Vec<Vec<Vec<usize>>>) -> Vec<USizeSet> {
             firsts[cur].set(cur, true);
             return;
         }
-        for dep in rules[cur]
-            .iter()
-            .filter_map(|prod| prod.first().map(|x| *x))
-            .filter(|dep| *dep != cur)
+        for dep in
+            rules[cur].iter().filter_map(|prod| prod.first().map(|x| *x)).filter(|dep| *dep != cur)
         {
             if !vis[dep] {
                 helper(firsts, vis, rules, dep);
@@ -336,7 +330,7 @@ fn get_derived_lookaheads(
         firsts: &Vec<USizeSet>,
         result: &mut Vec<Option<USizeSet>>,
         rules: &Vec<Vec<Vec<usize>>>,
-        debug: bool
+        debug: bool,
     ) {
         if let Some(ref mut cur_result) = result[cur] {
             *cur_result |= cur_lookahead
@@ -356,18 +350,9 @@ fn get_derived_lookaheads(
         }
     }
     let mut result = vec![None; rules.len()];
-    let cur_lookahead = rules[seed.nt][seed.rule]
-        .get(seed.pos + 1)
-        .map(|n| &firsts[*n])
-        .unwrap_or(seed_lookahead);
-    helper(
-        rules[seed.nt][seed.rule][seed.pos],
-        cur_lookahead,
-        firsts,
-        &mut result,
-        rules,
-        debug,
-    );
+    let cur_lookahead =
+        rules[seed.nt][seed.rule].get(seed.pos + 1).map(|n| &firsts[*n]).unwrap_or(seed_lookahead);
+    helper(rules[seed.nt][seed.rule][seed.pos], cur_lookahead, firsts, &mut result, rules, debug);
     result
 }
 
@@ -393,11 +378,7 @@ impl ParseDFA {
                 (
                     (
                         (0..rule.len())
-                            .map(|j| SeedRule {
-                                nt: i,
-                                rule: j,
-                                pos: 0,
-                            })
+                            .map(|j| SeedRule { nt: i, rule: j, pos: 0 })
                             .collect::<Vec<_>>(),
                         vec![firsts.last().unwrap().clone(); rule.len()],
                     ),
@@ -407,9 +388,8 @@ impl ParseDFA {
             .collect::<Vec<_>>();
         let mut stack: Vec<_> = node_to_state.iter().filter_map(|i| *i).collect();
         let mut states = IndexableMap::from(states_vec);
-        let derived_rules = (0..rules.len())
-            .map(|i| get_derived_rules(&rules, i))
-            .collect::<Vec<_>>();
+        let derived_rules =
+            (0..rules.len()).map(|i| get_derived_rules(&rules, i)).collect::<Vec<_>>();
 
         while let Some(cur_state) = stack.pop() {
             // every non-reduce seed and its lookahead
@@ -427,29 +407,21 @@ impl ParseDFA {
             let mut trans_seeds = vec![vec![]; rules.len()];
             let mut trans_lookaheads = vec![vec![]; rules.len()];
             for (seed, lookahead) in iter_state() {
-                let new_seed = SeedRule {
-                    nt: seed.nt,
-                    rule: seed.rule,
-                    pos: seed.pos + 1,
-                };
+                let new_seed = SeedRule { nt: seed.nt, rule: seed.rule, pos: seed.pos + 1 };
                 let edge = rules[seed.nt][seed.rule][seed.pos];
                 // seeds dont overlap so neither do new seeds
                 trans_seeds[edge].push(new_seed);
                 trans_lookaheads[edge].push(lookahead.clone());
             }
             let derived_lookaheads = iter_state()
-                .map(|(seed, lookahead)| get_derived_lookaheads(seed, &lookahead, &firsts, &rules, cur_state == 1422))
+                .map(|(seed, lookahead)| {
+                    get_derived_lookaheads(seed, &lookahead, &firsts, &rules, cur_state == 1422)
+                })
                 .collect::<Vec<_>>();
             for (i, rule) in iter_state().enumerate().flat_map(|(i, (seed, _))| {
-                derived_rules[rules[seed.nt][seed.rule][seed.pos]]
-                    .iter()
-                    .map(move |rule| (i, rule))
+                derived_rules[rules[seed.nt][seed.rule][seed.pos]].iter().map(move |rule| (i, rule))
             }) {
-                let new_seed = SeedRule {
-                    nt: rule.0,
-                    rule: rule.1,
-                    pos: 1,
-                };
+                let new_seed = SeedRule { nt: rule.0, rule: rule.1, pos: 1 };
                 let edge = rules[rule.0][rule.1][0];
                 if let Some((tran, _)) = trans_seeds[edge]
                     .iter()
@@ -482,14 +454,14 @@ impl ParseDFA {
             states[cur_state].1 = true_tran;
         }
 
-        Self {
-            rules,
-            states,
-            node_to_state,
-        }
+        Self { rules, states, node_to_state }
     }
 
-    pub fn write_to_file(&self, f: &mut std::fs::File, id_productions: &Vec<String>) -> std::io::Result<()> {
+    pub fn write_to_file(
+        &self,
+        f: &mut std::fs::File,
+        id_productions: &Vec<String>,
+    ) -> std::io::Result<()> {
         for (i, (seeds, trans)) in self.states.iter().enumerate() {
             let lookaheads = &seeds.1;
             let seeds = &seeds.0;
@@ -498,10 +470,13 @@ impl ParseDFA {
             for (seed, lookahead) in seeds.iter().zip(lookaheads.iter()) {
                 write!(f, "    {} =>", id_productions[seed.nt])?;
                 for (j, symbol) in self.rules[seed.nt][seed.rule].iter().enumerate() {
-                    if j == seed.pos{
+                    if j == seed.pos {
                         write!(f, " |")?;
                     }
                     write!(f, " {}", id_productions[*symbol])?;
+                }
+                if seed.pos == self.rules[seed.nt][seed.rule].len() {
+                    write!(f, " |")?;
                 }
                 write!(f, " [")?;
                 for (j, symbol) in lookahead.iter().enumerate() {
