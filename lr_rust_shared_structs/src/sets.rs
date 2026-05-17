@@ -1,14 +1,11 @@
 use std::{
-    collections::BTreeMap,
-    fmt::Debug,
-    ops::{BitOr, BitOrAssign, Index, IndexMut, Not},
-    rc::Rc,
+    collections::HashMap, fmt::Debug, hash::Hash, ops::{BitOr, BitOrAssign, Index, IndexMut, Not}, rc::Rc
 };
 
 use proc_macro2::{Punct, Spacing, TokenStream};
 use quote::{ToTokens, TokenStreamExt, quote};
 
-#[derive(Default, Clone, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Default, Clone, Eq, PartialEq, Hash)]
 pub struct USizeSet(pub Vec<u64>);
 
 impl Debug for USizeSet {
@@ -135,15 +132,15 @@ impl<'a> Iterator for USizeSetIterator<'a> {
 
 pub struct IndexableMap<T, U>
 where
-    T: Clone + Eq + Ord + PartialEq + PartialOrd,
+    T: Clone + Eq + PartialEq,
 {
-    map: BTreeMap<Rc<T>, usize>,
+    map: HashMap<Rc<T>, usize>,
     vec: Vec<(Rc<T>, U)>,
 }
 
 impl<T, U> Debug for IndexableMap<T, U>
 where
-    T: Debug + Clone + Eq + Ord + PartialEq + PartialOrd,
+    T: Debug + Clone + Eq + PartialEq + Hash,
     U: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -158,7 +155,7 @@ where
 
 impl<T, U> IndexableMap<T, U>
 where
-    T: Clone + Eq + Ord + PartialEq + PartialOrd,
+    T: Clone + Eq + PartialEq + Hash,
 {
     pub fn len(&self) -> usize {
         self.vec.len()
@@ -196,7 +193,7 @@ where
 
 impl<T, U> Index<usize> for IndexableMap<T, U>
 where
-    T: Clone + Eq + Ord + PartialEq + PartialOrd,
+    T: Clone + Eq + PartialEq + Hash,
 {
     fn index(&self, index: usize) -> &Self::Output {
         &self.vec[index]
@@ -206,7 +203,7 @@ where
 
 impl<T, U> IndexMut<usize> for IndexableMap<T, U>
 where
-    T: Clone + Eq + Ord + PartialEq + PartialOrd,
+    T: Clone + Eq + PartialEq + Hash,
 {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         &mut self.vec[index]
@@ -215,12 +212,12 @@ where
 
 impl<T, U> From<Vec<(T, U)>> for IndexableMap<T, U>
 where
-    T: Clone + Eq + Ord + PartialEq + PartialOrd,
+    T: Clone + Eq + PartialEq + Hash,
 {
     fn from(items: Vec<(T, U)>) -> Self {
         let vec: Vec<_> = items.into_iter().map(|(t, u)| (Rc::new(t), u)).collect();
         Self {
-            map: BTreeMap::from_iter(vec.iter().enumerate().map(|(i, (t, _))| (Rc::clone(t), i))),
+            map: HashMap::from_iter(vec.iter().enumerate().map(|(i, (t, _))| (Rc::clone(t), i))),
             vec,
         }
     }
@@ -228,12 +225,12 @@ where
 
 impl<T, U, const N: usize> From<[(T, U); N]> for IndexableMap<T, U>
 where
-    T: Clone + Eq + Ord + PartialEq + PartialOrd,
+    T: Clone + Eq + PartialEq + Hash,
 {
     fn from(items: [(T, U); N]) -> Self {
         let vec: Vec<_> = items.into_iter().map(|(t, u)| (Rc::new(t), u)).collect();
         Self {
-            map: BTreeMap::from_iter(vec.iter().enumerate().map(|(i, (t, _))| (Rc::clone(t), i))),
+            map: HashMap::from_iter(vec.iter().enumerate().map(|(i, (t, _))| (Rc::clone(t), i))),
             vec,
         }
     }
@@ -241,7 +238,7 @@ where
 
 impl<T, U> ToTokens for IndexableMap<T, U>
 where
-    T: ToTokens + Clone + Eq + Ord + PartialEq + PartialOrd,
+    T: ToTokens + Clone + Eq + PartialEq,
     U: ToTokens,
 {
     fn to_tokens(&self, tokens: &mut TokenStream) {

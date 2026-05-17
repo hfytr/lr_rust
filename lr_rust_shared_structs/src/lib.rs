@@ -193,8 +193,8 @@ impl<N: Clone + Debug, St: Debug, Sp: Debug> Engine<N, St, Sp> {
                 }
                 ParseAction::Goto(_) => return Result::Err(ERR_TERMINAL_GOTO),
             }
+            writer.flush().map_err(|_| ERR_IO)?;
         }
-        writer.flush().map_err(|_| ERR_IO)?;
         cur_lexeme?;
         if node_stack.len() != 1 {
             return Result::Err(ERR_NODE_STACK_NOT_EMPTY);

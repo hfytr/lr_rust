@@ -16,7 +16,7 @@ pub const PA_ID_GOTO: usize = 1;
 pub const PA_ID_REDUCE: usize = 2;
 pub const PA_ID_INVALID: usize = 3;
 
-#[derive(Debug, Clone, Ord, PartialEq, PartialOrd, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct SeedRule {
     nt: usize,
     rule: usize,
@@ -122,7 +122,7 @@ impl ParseTable {
         let mut conflicts = vec![];
         #[cfg(not(feature = "lr1"))]
         let (state_ids, max_id) = {
-            let mut found_seeds = std::collections::BTreeMap::<&Vec<SeedRule>, usize>::new();
+            let mut found_seeds = std::collections::HashMap::<&Vec<SeedRule>, usize>::new();
             let mut state_ids = vec![usize::MAX; dfa.states.len()];
             for (i, (state, _)) in dfa.states.iter().enumerate() {
                 state_ids[i] = found_seeds.get(&state.0).map(|i| *i).unwrap_or_else(|| {

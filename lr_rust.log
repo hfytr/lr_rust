@@ -1,0 +1,193 @@
+-- PARSER ACTIONS --
+State stack: [0]
+Looking at token Literal
+Shifted state 3
+State stack: [0, 3]
+Looking at token Multiply
+Reducing 1 tokens to Factor.
+State stack: [0, 7]
+Looking at token Multiply
+Shifted state 9
+State stack: [0, 7, 9]
+Looking at token Literal
+Shifted state 3
+State stack: [0, 7, 9, 3]
+Looking at token Multiply
+Reducing 1 tokens to Factor.
+State stack: [0, 7, 9, 7]
+Looking at token Multiply
+Shifted state 9
+State stack: [0, 7, 9, 7, 9]
+Looking at token LeftParen
+Shifted state 4
+State stack: [0, 7, 9, 7, 9, 4]
+Looking at token Literal
+Shifted state 3
+State stack: [0, 7, 9, 7, 9, 4, 3]
+Looking at token Plus
+Reducing 1 tokens to Factor.
+State stack: [0, 7, 9, 7, 9, 4, 7]
+Looking at token Plus
+Reducing 1 tokens to Term.
+State stack: [0, 7, 9, 7, 9, 4, 6]
+Looking at token Plus
+Shifted state 11
+State stack: [0, 7, 9, 7, 9, 4, 6, 11]
+Looking at token Literal
+Shifted state 3
+State stack: [0, 7, 9, 7, 9, 4, 6, 11, 3]
+Looking at token RightParen
+Reducing 1 tokens to Factor.
+State stack: [0, 7, 9, 7, 9, 4, 6, 11, 7]
+Looking at token RightParen
+Reducing 1 tokens to Term.
+State stack: [0, 7, 9, 7, 9, 4, 6, 11, 6]
+Looking at token RightParen
+Reducing 1 tokens to Expr.
+State stack: [0, 7, 9, 7, 9, 4, 6, 11, 12]
+Looking at token RightParen
+Reducing 3 tokens to Expr.
+State stack: [0, 7, 9, 7, 9, 4, 5]
+Looking at token RightParen
+Shifted state 8
+State stack: [0, 7, 9, 7, 9, 4, 5, 8]
+Looking at token Plus
+Reducing 3 tokens to Factor.
+State stack: [0, 7, 9, 7, 9, 7]
+Looking at token Plus
+Reducing 1 tokens to Term.
+State stack: [0, 7, 9, 7, 9, 10]
+Looking at token Plus
+Reducing 3 tokens to Term.
+State stack: [0, 7, 9, 10]
+Looking at token Plus
+Reducing 3 tokens to Term.
+State stack: [0, 6]
+Looking at token Plus
+Shifted state 11
+State stack: [0, 6, 11]
+Looking at token Literal
+Shifted state 3
+State stack: [0, 6, 11, 3]
+Looking at token Multiply
+Reducing 1 tokens to Factor.
+State stack: [0, 6, 11, 7]
+Looking at token Multiply
+Shifted state 9
+State stack: [0, 6, 11, 7, 9]
+Looking at token LeftParen
+Shifted state 4
+State stack: [0, 6, 11, 7, 9, 4]
+Looking at token Literal
+Shifted state 3
+State stack: [0, 6, 11, 7, 9, 4, 3]
+Looking at token Plus
+Reducing 1 tokens to Factor.
+State stack: [0, 6, 11, 7, 9, 4, 7]
+Looking at token Plus
+Reducing 1 tokens to Term.
+State stack: [0, 6, 11, 7, 9, 4, 6]
+Looking at token Plus
+Shifted state 11
+State stack: [0, 6, 11, 7, 9, 4, 6, 11]
+Looking at token Literal
+Shifted state 3
+State stack: [0, 6, 11, 7, 9, 4, 6, 11, 3]
+Looking at token Multiply
+Reducing 1 tokens to Factor.
+State stack: [0, 6, 11, 7, 9, 4, 6, 11, 7]
+Looking at token Multiply
+Shifted state 9
+State stack: [0, 6, 11, 7, 9, 4, 6, 11, 7, 9]
+Looking at token LeftParen
+Shifted state 4
+State stack: [0, 6, 11, 7, 9, 4, 6, 11, 7, 9, 4]
+Looking at token Literal
+Shifted state 3
+State stack: [0, 6, 11, 7, 9, 4, 6, 11, 7, 9, 4, 3]
+Looking at token Plus
+Reducing 1 tokens to Factor.
+State stack: [0, 6, 11, 7, 9, 4, 6, 11, 7, 9, 4, 7]
+Looking at token Plus
+Reducing 1 tokens to Term.
+State stack: [0, 6, 11, 7, 9, 4, 6, 11, 7, 9, 4, 6]
+Looking at token Plus
+Shifted state 11
+State stack: [0, 6, 11, 7, 9, 4, 6, 11, 7, 9, 4, 6, 11]
+Looking at token Literal
+Shifted state 3
+State stack: [0, 6, 11, 7, 9, 4, 6, 11, 7, 9, 4, 6, 11, 3]
+Looking at token RightParen
+Reducing 1 tokens to Factor.
+State stack: [0, 6, 11, 7, 9, 4, 6, 11, 7, 9, 4, 6, 11, 7]
+Looking at token RightParen
+Reducing 1 tokens to Term.
+State stack: [0, 6, 11, 7, 9, 4, 6, 11, 7, 9, 4, 6, 11, 6]
+Looking at token RightParen
+Reducing 1 tokens to Expr.
+State stack: [0, 6, 11, 7, 9, 4, 6, 11, 7, 9, 4, 6, 11, 12]
+Looking at token RightParen
+Reducing 3 tokens to Expr.
+State stack: [0, 6, 11, 7, 9, 4, 6, 11, 7, 9, 4, 5]
+Looking at token RightParen
+Shifted state 8
+State stack: [0, 6, 11, 7, 9, 4, 6, 11, 7, 9, 4, 5, 8]
+Looking at token RightParen
+Reducing 3 tokens to Factor.
+State stack: [0, 6, 11, 7, 9, 4, 6, 11, 7, 9, 7]
+Looking at token RightParen
+Reducing 1 tokens to Term.
+State stack: [0, 6, 11, 7, 9, 4, 6, 11, 7, 9, 10]
+Looking at token RightParen
+Reducing 3 tokens to Term.
+State stack: [0, 6, 11, 7, 9, 4, 6, 11, 6]
+Looking at token RightParen
+Reducing 1 tokens to Expr.
+State stack: [0, 6, 11, 7, 9, 4, 6, 11, 12]
+Looking at token RightParen
+Reducing 3 tokens to Expr.
+State stack: [0, 6, 11, 7, 9, 4, 5]
+Looking at token RightParen
+Shifted state 8
+State stack: [0, 6, 11, 7, 9, 4, 5, 8]
+Looking at token Multiply
+Reducing 3 tokens to Factor.
+State stack: [0, 6, 11, 7, 9, 7]
+Looking at token Multiply
+Shifted state 9
+State stack: [0, 6, 11, 7, 9, 7, 9]
+Looking at token LeftParen
+Shifted state 4
+State stack: [0, 6, 11, 7, 9, 7, 9, 4]
+Looking at token Literal
+Shifted state 3
+State stack: [0, 6, 11, 7, 9, 7, 9, 4, 3]
+Looking at token RightParen
+Reducing 1 tokens to Factor.
+State stack: [0, 6, 11, 7, 9, 7, 9, 4, 7]
+Looking at token RightParen
+Reducing 1 tokens to Term.
+State stack: [0, 6, 11, 7, 9, 7, 9, 4, 6]
+Looking at token RightParen
+Reducing 1 tokens to Expr.
+State stack: [0, 6, 11, 7, 9, 7, 9, 4, 5]
+Looking at token RightParen
+Shifted state 8
+State stack: [0, 6, 11, 7, 9, 7, 9, 4, 5, 8]
+Looking at token EOF
+Reducing 3 tokens to Factor.
+State stack: [0, 6, 11, 7, 9, 7, 9, 7]
+Looking at token EOF
+Reducing 1 tokens to Term.
+State stack: [0, 6, 11, 7, 9, 7, 9, 10]
+Looking at token EOF
+Reducing 3 tokens to Term.
+State stack: [0, 6, 11, 7, 9, 10]
+Looking at token EOF
+Reducing 3 tokens to Term.
+State stack: [0, 6, 11, 6]
+Looking at token EOF
+Reducing 1 tokens to Expr.
+State stack: [0, 6, 11, 12]
+Looking at token EOF
+Reducing 3 tokens to Expr.

@@ -4,7 +4,7 @@ use crate::lexer::{Production, process_productions};
 use lr_rust_shared_structs::{ParseTable, RegexDFA, Trie};
 use proc_macro2::{Ident, Punct, Spacing, Span, TokenStream};
 use quote::{ToTokens, TokenStreamExt, quote, quote_spanned};
-use std::{collections::BTreeSet, process::exit};
+use std::{collections::HashSet, process::exit};
 use syn::{
     Error, Expr, ExprClosure, Token, Type, Visibility,
     parse::{Parse, discouraged::Speculative},
@@ -158,12 +158,12 @@ impl Parse for MacroBody {
                             content.parse::<Expr>().context(ERR_MISSING_SPAN_UPDATE)?;
                         span = Some((span_type, span_init, span_update));
                     }
-                    _ => panic!(),
+                    _ => unreachable!(),
                 }
             } else {
                 productions.push(input.parse()?);
             }
-            input.parse::<Token![,]>().unwrap();
+            input.parse::<Token![,]>()?;
         }
 
         let (regex, trie, parser, id_productions_raw) = process_productions(&productions);
@@ -347,7 +347,7 @@ fn parser2(input: TokenStream) -> Result<TokenStream, Error> {
 
     let (kinds, variants): (Vec<_>, Vec<_>) = productions
         .iter()
-        .scan(BTreeSet::new(), |seen, prod| {
+        .scan(HashSet::new(), |seen, prod| {
             if let Some((variant, name_raw)) = prod.get_variant()
                 && !seen.contains(name_raw)
             {
@@ -360,7 +360,7 @@ fn parser2(input: TokenStream) -> Result<TokenStream, Error> {
         .unzip();
 
     Ok(quote! {
-        #[derive(Clone, Copy, Debug)]
+        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
         #[allow(dead_code)]
         #kind_def { #(#kinds),* }
         impl Into<usize> for #kind_type {

@@ -5,7 +5,7 @@ use crate::{
 };
 use proc_macro2::{Punct, Spacing, TokenStream};
 use quote::{ToTokens, TokenStreamExt, quote};
-use std::{collections::BTreeMap, fmt::Debug, rc::Rc};
+use std::{collections::HashMap, fmt::Debug, rc::Rc};
 
 #[derive(Clone, Copy)]
 pub struct TrieNode {
@@ -207,7 +207,7 @@ impl RegexDFA {
                 .flat_map(|node| nfa.edges[node].iter())
                 .filter_map(|(edge, dest)| edge.map(|e| (e, dest)))
             {
-                let mut new_state_map: BTreeMap<usize, usize> = BTreeMap::new();
+                let mut new_state_map: HashMap<usize, usize> = HashMap::new();
                 let new_state = nfa.epsilon_closure(*dest);
                 let base_state_ind = res.states.get_ind(&new_state).unwrap_or_else(|| {
                     stack.push(res.states.len());
